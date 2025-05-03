@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 /// <summary>
-/// External mesh tools, source can be found at 
+/// External mesh tools, source can be found at https://github.com/HatOnGithub/UnityMarchingCubesTool
 /// </summary>
 public static class Tools {
 
@@ -18,7 +18,7 @@ public static class Tools {
     /// <param name="min">Starting point of the grid</param>
     /// <param name="distanceToSurface">
     /// Function to calculate whether a vertex is inside or outside the mesh <br/>
-    /// This fucntion is also used to interpolate the mesh vertices to the exact intersect point on the edge</param>
+    /// This function is also used to interpolate the mesh vertices to the exact intersect point on the edge</param>
     /// <param name="isoLevel">Cutoff point for being inside or outside the mesh, affects interpolation</param>
     /// <returns>An approximated mesh</returns>
     public static Mesh MarchingCubes(int3 size, float gridSize, float3 min, Func<float3, float> distanceToSurface, float isoLevel = 0) {
