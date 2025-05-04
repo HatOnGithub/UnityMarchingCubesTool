@@ -32,6 +32,51 @@ public static class Tools {
         List<Vector3> meshVerts = new();
         List<int> triangles = new();
 
+        #region Index Conversions and Helper Functions
+        #pragma warning disable CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
+        float3 cubeIndexToPosition(int index, int x, int y, int z) 
+        {
+            return index switch { 
+                0 => cubeVerts[x    , y    , z    ],
+                1 => cubeVerts[x    , y    , z + 1],
+                2 => cubeVerts[x + 1, y    , z + 1],
+                3 => cubeVerts[x + 1, y    , z    ],
+                4 => cubeVerts[x    , y + 1, z    ],
+                5 => cubeVerts[x    , y + 1, z + 1],
+                6 => cubeVerts[x + 1, y + 1, z + 1],
+                7 => cubeVerts[x + 1, y + 1, z    ],
+            };
+        }
+
+        float cubeIndexToValue(int index, int x, int y, int z) { 
+            return index switch { 
+                0 => vals[x    , y    , z    ],
+                1 => vals[x    , y    , z + 1],
+                2 => vals[x + 1, y    , z + 1],
+                3 => vals[x + 1, y    , z    ],
+                4 => vals[x    , y + 1, z    ],
+                5 => vals[x    , y + 1, z + 1],
+                6 => vals[x + 1, y + 1, z + 1],
+                7 => vals[x + 1, y + 1, z    ],
+            };
+        };
+
+        (int, int, int) indexTo3DIndex(int index, int x, int y, int z)
+        {
+            return index switch {
+                0 => (x    , y    , z    ),
+                1 => (x    , y    , z + 1),
+                2 => (x + 1, y    , z + 1),
+                3 => (x + 1, y    , z    ),
+                4 => (x    , y + 1, z    ),
+                5 => (x    , y + 1, z + 1),
+                6 => (x + 1, y + 1, z + 1),
+                7 => (x + 1, y + 1, z    )
+            };
+        };
+        #pragma warning restore CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
+        #endregion
+
 
         // Calculate cube vertice locations and distance to surface
         for (int z = 0; z <= size.z; z++)
@@ -41,102 +86,69 @@ public static class Tools {
                     cubeVerts[x, y, z] = pos;
                     vals[x, y, z] = distanceToSurface(pos);
                 }
-        
+
+        // Allocate the outside loop to lower mallocs
+        int edges, cubeIndex;
+        int[] edgeVerts = new int[12], tris; // Store index of the added vertex rather than the vertex itself
+
         // Marching cubes with vertex sharing
         for (int z = 0; z < size.z; z++)
             for (int y = 0; y < size.y; y++)
                 for (int x = 0; x < size.x; x++) {
-                    #region Index Conversions and Helper Functions
 
-                    float3[] cubeIndexToPosition = new float3[] {
-                            cubeVerts[x    , y    , z    ],
-                            cubeVerts[x    , y    , z + 1],
-                            cubeVerts[x + 1, y    , z + 1],
-                            cubeVerts[x + 1, y    , z    ],
-                            cubeVerts[x    , y + 1, z    ],
-                            cubeVerts[x    , y + 1, z + 1],
-                            cubeVerts[x + 1, y + 1, z + 1],
-                            cubeVerts[x + 1, y + 1, z    ],
-                    };
-
-                    float[] cubeIndexToValue = new float[] {
-                            vals[x    , y    , z    ],
-                            vals[x    , y    , z + 1],
-                            vals[x + 1, y    , z + 1],
-                            vals[x + 1, y    , z    ],
-                            vals[x    , y + 1, z    ],
-                            vals[x    , y + 1, z + 1],
-                            vals[x + 1, y + 1, z + 1],
-                            vals[x + 1, y + 1, z    ]
-                    };
-
-                    (int, int, int)[] indexTo3DIndex = new (int,int,int)[]{
-                            (x    , y    , z    ),
-                            (x    , y    , z + 1),
-                            (x + 1, y    , z + 1),
-                            (x + 1, y    , z    ),
-                            (x    , y + 1, z    ),
-                            (x    , y + 1, z + 1),
-                            (x + 1, y + 1, z + 1),
-                            (x + 1, y + 1, z    )
-                    };
-                    #endregion
-
-                    int cubeIndex = 0;
+                    cubeIndex = 0;
 
                     for (int i = 0; i < 8; i++)
-                        if (cubeIndexToValue[i] <= isoLevel)
+                        if (cubeIndexToValue(i,x,y,z) <= isoLevel)
                             cubeIndex |= 1 << i;
 
-                    int edges = _edgeTable[cubeIndex]; // Get the intersected edges from a table
+                    edges = _edgeTable[cubeIndex]; // Get the intersected edges from a table
 
                     if (edges == 0) continue; // cube fully inside or outside mesh
-
-                    var edgeVerts = new int[12]; // Store index of the added vertex rather than the vertex itself
 
                     // Checks if a vertex has already been calculated for the edge,
                     // if so, return its index, this facilitates vertex sharing for triangles
                     // otherwise, calculate the new vertex, add it to the list of vertices and remember the index
                     int TryAddOrReturnOld(int vertex1, int vertex2, float val1, float val2) {
-                        var index1 = indexTo3DIndex[vertex1];
-                        var index2 = indexTo3DIndex[vertex2];
+                        var index1 = indexTo3DIndex(vertex1, x, y, z);
+                        var index2 = indexTo3DIndex(vertex2, x, y, z);
 
                         if (edgeVertIndexPairs.TryGetValue((index1, index2), out var existingIndex))
                             return existingIndex;
 
                         int newIndex = meshVerts.Count;
-                        meshVerts.Add(VertexInterp(cubeIndexToPosition[vertex1], cubeIndexToPosition[vertex2], val1, val2));
+                        meshVerts.Add(VertexInterp(cubeIndexToPosition(vertex1, x, y, z), cubeIndexToPosition(vertex2, x, y, z), val1, val2));
                         edgeVertIndexPairs[(index1, index2)] = newIndex;
                         return newIndex;
                     }
 
                     // go through each edge and calculate the position of the intersection should they be part of the slices
-                    if ((edges & 1) != 0) edgeVerts[0] = TryAddOrReturnOld(0, 1, cubeIndexToValue[0], cubeIndexToValue[1]);
+                    if ((edges & 1) != 0) edgeVerts[0] = TryAddOrReturnOld(0, 1, cubeIndexToValue(0, x, y, z), cubeIndexToValue(1, x, y, z));
 
-                    if ((edges & 2) != 0) edgeVerts[1] = TryAddOrReturnOld(1, 2, cubeIndexToValue[1], cubeIndexToValue[2]);
+                    if ((edges & 2) != 0) edgeVerts[1] = TryAddOrReturnOld(1, 2, cubeIndexToValue(1, x, y, z), cubeIndexToValue(2, x, y, z));
 
-                    if ((edges & 4) != 0) edgeVerts[2] = TryAddOrReturnOld(2, 3, cubeIndexToValue[2], cubeIndexToValue[3]);
+                    if ((edges & 4) != 0) edgeVerts[2] = TryAddOrReturnOld(2, 3, cubeIndexToValue(2, x, y, z), cubeIndexToValue(3, x, y, z));
 
-                    if ((edges & 8) != 0) edgeVerts[3] = TryAddOrReturnOld(3, 0, cubeIndexToValue[3], cubeIndexToValue[0]);
+                    if ((edges & 8) != 0) edgeVerts[3] = TryAddOrReturnOld(3, 0, cubeIndexToValue(3, x, y, z), cubeIndexToValue(0, x, y, z));
 
-                    if ((edges & 16) != 0) edgeVerts[4] = TryAddOrReturnOld(4, 5, cubeIndexToValue[4], cubeIndexToValue[5]);
+                    if ((edges & 16) != 0) edgeVerts[4] = TryAddOrReturnOld(4, 5, cubeIndexToValue(4, x, y, z), cubeIndexToValue(5, x, y, z));
 
-                    if ((edges & 32) != 0) edgeVerts[5] = TryAddOrReturnOld(5, 6, cubeIndexToValue[5], cubeIndexToValue[6]);
+                    if ((edges & 32) != 0) edgeVerts[5] = TryAddOrReturnOld(5, 6, cubeIndexToValue(5, x, y, z), cubeIndexToValue(6, x, y, z));
 
-                    if ((edges & 64) != 0) edgeVerts[6] = TryAddOrReturnOld(6, 7, cubeIndexToValue[6], cubeIndexToValue[7]);
+                    if ((edges & 64) != 0) edgeVerts[6] = TryAddOrReturnOld(6, 7, cubeIndexToValue(6, x, y, z), cubeIndexToValue(7, x, y, z));
 
-                    if ((edges & 128) != 0) edgeVerts[7] = TryAddOrReturnOld(7, 4, cubeIndexToValue[7], cubeIndexToValue[4]);
+                    if ((edges & 128) != 0) edgeVerts[7] = TryAddOrReturnOld(7, 4, cubeIndexToValue(7, x, y, z), cubeIndexToValue(4, x, y, z));
 
-                    if ((edges & 256) != 0) edgeVerts[8] = TryAddOrReturnOld(0, 4, cubeIndexToValue[0], cubeIndexToValue[4]);
+                    if ((edges & 256) != 0) edgeVerts[8] = TryAddOrReturnOld(0, 4, cubeIndexToValue(0, x, y, z), cubeIndexToValue(4, x, y, z));
 
-                    if ((edges & 512) != 0) edgeVerts[9] = TryAddOrReturnOld(1, 5, cubeIndexToValue[1], cubeIndexToValue[5]);
+                    if ((edges & 512) != 0) edgeVerts[9] = TryAddOrReturnOld(1, 5, cubeIndexToValue(1, x, y, z), cubeIndexToValue(5, x, y, z));
 
-                    if ((edges & 1024) != 0) edgeVerts[10] = TryAddOrReturnOld(2, 6, cubeIndexToValue[2], cubeIndexToValue[6]);
+                    if ((edges & 1024) != 0) edgeVerts[10] = TryAddOrReturnOld(2, 6, cubeIndexToValue(2, x, y, z), cubeIndexToValue(6, x, y, z));
 
-                    if ((edges & 2048) != 0) edgeVerts[11] = TryAddOrReturnOld(3, 7, cubeIndexToValue[3], cubeIndexToValue[7]);
+                    if ((edges & 2048) != 0) edgeVerts[11] = TryAddOrReturnOld(3, 7, cubeIndexToValue(3, x, y, z), cubeIndexToValue(7, x, y, z));
 
                     // Get the triangle triples from the table found in MarchingCubesTable.cs
-                    int[] tris = _triTable[cubeIndex];
+                    tris = _triTable[cubeIndex];
 
                     for (int i = 0; tris[i] != -1 && i < 12; i += 3) {
                         triangles.Add(edgeVerts[tris[i + 2]]); // Order reversed due to differing CW/CCW order used by unity
@@ -145,7 +157,7 @@ public static class Tools {
                     }
                 }
 
-        Mesh mesh = new Mesh();
+        Mesh mesh = new();
 
         mesh.SetVertices(meshVerts);
         mesh.SetTriangles(triangles, 0);
@@ -155,8 +167,6 @@ public static class Tools {
 
         return mesh;
     }
-
-
 
     public static Vector3 VertexInterp(float3 p1, float3 p2, float v1, float v2) {
 
@@ -170,13 +180,15 @@ public static class Tools {
 
         if (Mathf.Abs(v1) < 0.0001f) return (Vector3)p1;
         if (Mathf.Abs(v2) < 0.0001f) return (Vector3)p2;
-
+        
         return (Vector3)math.lerp(p1, p2, (isoLevel - v1) / (v2 - v1));
     }
 
     public static float Magnitude(this float3 v) {
         return Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     }
+
+   
 
     #region Old Marching Cubes
 
