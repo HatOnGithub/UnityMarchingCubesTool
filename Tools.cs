@@ -98,13 +98,14 @@ public static class Tools {
 
                     cubeIndex = 0;
 
+                    // flag each cube vertex: inside (1) or outside mesh (0)
                     for (int i = 0; i < 8; i++)
                         if (cubeIndexToValue(i,x,y,z) <= isoLevel)
                             cubeIndex |= 1 << i;
 
                     edges = _edgeTable[cubeIndex]; // Get the intersected edges from a table
 
-                    if (edges == 0) continue; // cube fully inside or outside mesh
+                    if (edges == 0) continue; // skip if the cube is fully inside or outside mesh
 
                     // Checks if a vertex has already been calculated for the edge,
                     // if so, return its index, this facilitates vertex sharing for triangles
@@ -123,21 +124,22 @@ public static class Tools {
                     }
 
                     // go through each edge and calculate the position of the intersection should they be part of the slices
+                    // Edges always end towards a positive direction
                     if ((edges & 1) != 0) edgeVerts[0] = TryAddOrReturnOld(0, 1, cubeIndexToValue(0, x, y, z), cubeIndexToValue(1, x, y, z));
 
                     if ((edges & 2) != 0) edgeVerts[1] = TryAddOrReturnOld(1, 2, cubeIndexToValue(1, x, y, z), cubeIndexToValue(2, x, y, z));
 
-                    if ((edges & 4) != 0) edgeVerts[2] = TryAddOrReturnOld(2, 3, cubeIndexToValue(2, x, y, z), cubeIndexToValue(3, x, y, z));
+                    if ((edges & 4) != 0) edgeVerts[2] = TryAddOrReturnOld(3, 2, cubeIndexToValue(3, x, y, z), cubeIndexToValue(2, x, y, z));
 
-                    if ((edges & 8) != 0) edgeVerts[3] = TryAddOrReturnOld(3, 0, cubeIndexToValue(3, x, y, z), cubeIndexToValue(0, x, y, z));
+                    if ((edges & 8) != 0) edgeVerts[3] = TryAddOrReturnOld(0, 3, cubeIndexToValue(0, x, y, z), cubeIndexToValue(3, x, y, z));
 
                     if ((edges & 16) != 0) edgeVerts[4] = TryAddOrReturnOld(4, 5, cubeIndexToValue(4, x, y, z), cubeIndexToValue(5, x, y, z));
 
                     if ((edges & 32) != 0) edgeVerts[5] = TryAddOrReturnOld(5, 6, cubeIndexToValue(5, x, y, z), cubeIndexToValue(6, x, y, z));
 
-                    if ((edges & 64) != 0) edgeVerts[6] = TryAddOrReturnOld(6, 7, cubeIndexToValue(6, x, y, z), cubeIndexToValue(7, x, y, z));
+                    if ((edges & 64) != 0) edgeVerts[6] = TryAddOrReturnOld(7, 6, cubeIndexToValue(7, x, y, z), cubeIndexToValue(6, x, y, z));
 
-                    if ((edges & 128) != 0) edgeVerts[7] = TryAddOrReturnOld(7, 4, cubeIndexToValue(7, x, y, z), cubeIndexToValue(4, x, y, z));
+                    if ((edges & 128) != 0) edgeVerts[7] = TryAddOrReturnOld(4, 7, cubeIndexToValue(4, x, y, z), cubeIndexToValue(7, x, y, z));
 
                     if ((edges & 256) != 0) edgeVerts[8] = TryAddOrReturnOld(0, 4, cubeIndexToValue(0, x, y, z), cubeIndexToValue(4, x, y, z));
 
@@ -164,6 +166,7 @@ public static class Tools {
         mesh.Optimize();
         mesh.RecalculateNormals();
         mesh.RecalculateTangents();
+        mesh.SetColors(Array.ConvertAll(mesh.normals, vec => new Color(vec.x, vec.y, vec.z)));
 
         return mesh;
     }
@@ -187,7 +190,6 @@ public static class Tools {
     public static float Magnitude(this float3 v) {
         return Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     }
-
    
 
     #region Old Marching Cubes
