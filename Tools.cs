@@ -118,7 +118,7 @@ public static class Tools {
                             return existingIndex;
 
                         int newIndex = meshVerts.Count;
-                        meshVerts.Add(VertexInterp(cubeIndexToPosition(vertex1, x, y, z), cubeIndexToPosition(vertex2, x, y, z), val1, val2));
+                        meshVerts.Add(VertexInterp(isoLevel, cubeIndexToPosition(vertex1, x, y, z), cubeIndexToPosition(vertex2, x, y, z), val1, val2));
                         edgeVertIndexPairs[(index1, index2)] = newIndex;
                         return newIndex;
                     }
