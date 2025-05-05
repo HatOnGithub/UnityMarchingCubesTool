@@ -152,7 +152,7 @@ public static class Tools {
                     // Get the triangle triples from the table found in MarchingCubesTable.cs
                     tris = _triTable[cubeIndex];
 
-                    for (int i = 0; tris[i] != -1 && i < 12; i += 3) {
+                    for (int i = 0; tris[i] != -1; i += 3) {
                         triangles.Add(edgeVerts[tris[i + 2]]); // Order reversed due to differing CW/CCW order used by unity
                         triangles.Add(edgeVerts[tris[i + 1]]);
                         triangles.Add(edgeVerts[tris[i]]);
